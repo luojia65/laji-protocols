@@ -3,5 +3,12 @@ name = "laji-protocols"
 version = "0.0.0"
 edition = "2018"
 
+[dependencies.mio]
+optional = true
+version = "0.6"
+
 [dev-dependencies]
 chrono = "0.4"
+
+[features]
+mio-powered = ["mio"]
