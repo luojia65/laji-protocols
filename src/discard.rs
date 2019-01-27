@@ -10,6 +10,7 @@ where A: ToSocketAddrs, F: FnMut() -> H, H: Handler {
     Ok(()) 
 }
 
+#[derive(Debug)]
 pub struct LajiDiscard<F>
 where F: Factory {
     tcp: TcpListener,
@@ -106,7 +107,7 @@ where H: Handler, F: FnMut() -> H {
 
 #[cfg(test)]
 mod tests {
-    mod laji_echo {
+    mod laji_discard {
         pub use super::super::*;
     }
     use std::thread;
@@ -114,21 +115,20 @@ mod tests {
     #[test]
     fn test_listen() {
         thread::spawn(move || {
-            laji_echo::listen("0.0.0.0:9", move || {
-                |shake| {
+            laji_discard::listen("0.0.0.0:9", move || {
+                |shake| {  
                     println!("Rejected: {:?}", shake);
-                }
+                } 
             }).unwrap();
         });
         thread::spawn(move || {
-            laji_echo::listen("0.0.0.0:9999", move || {
+            laji_discard::listen("0.0.0.0:9999", move || {
                 (|shake| {
                     println!("Opened a session: {:?}", shake);
                 },
                 ||{
                     println!("Closed a session")
-                }
-                )
+                })
             }).unwrap();
         });
         TcpStream::connect("127.0.0.1:9").unwrap();
