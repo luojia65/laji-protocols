@@ -76,7 +76,7 @@ where F: Factory + Send + Sync + 'static {
             let err_tx = err_tx.clone();
             let factory = Arc::clone(&factory);
             thread::spawn(move || {
-                let mut buf = [0u8; 0];
+                let mut buf = [0u8; 1024];
                 let mut ans = || {
                     let (_size, addr) = socket.recv_from(&mut buf)?;
                     let hs = Handshake::from_udp_addr(addr);
@@ -87,7 +87,9 @@ where F: Factory + Send + Sync + 'static {
                     handler.on_close();
                     Ok(())
                 };
-                ans().unwrap_or_else(|e: io::Error| err_tx.send(e).unwrap())
+                loop {
+                    ans().unwrap_or_else(|e: io::Error| err_tx.send(e).unwrap())
+                }
             });
         }
         while let Ok(err) = err_rx.recv() {
@@ -201,15 +203,53 @@ mod tests {
     mod laji_daytime {
         pub use super::super::*;
     }
+    use std::io;
     #[test]
     fn execute() {
         laji_daytime::listen_tcp("0.0.0.0:13", move |mut out| {
             move || {
-                let time = chrono::offset::Local::now();
-                let s = time.to_rfc2822();
-                out.send(s).unwrap();
+                out.send(time_string()).unwrap();
             }
         }).unwrap();
+    }
+
+    #[test]
+    fn batch() -> io::Result<()> {
+        use super::*;
+        struct MyFactory;
+        impl Factory for MyFactory {
+            type Handler = MyHandler;
+            fn connection_made(&mut self, sender: Sender) -> MyHandler {
+                MyHandler(sender)
+            }
+        }
+        struct MyHandler(Sender);
+        impl Handler for MyHandler {
+            fn on_open(&mut self, shake: Handshake) {
+                println!("Open! Shake: [{:?}]", shake);
+            }
+            fn on_request(&mut self) {
+                let string = time_string();
+                self.0.send(string.clone()).unwrap();
+                println!("Sent! [{:?}]", string);
+            }
+            fn on_close(&mut self) {
+                println!("Closed!")
+            }
+        }
+        LajiDaytime::new(MyFactory)
+            .bind_tcp("0.0.0.0:13")?
+            .bind_tcp("0.0.0.0:13333")?
+            .bind_udp("0.0.0.0:13")?
+            .bind_udp("0.0.0.0:13333")?
+            .run()
+            .expect("Error occurred!");
+        Ok(())
+    }
+
+    #[inline]
+    fn time_string() -> String {
+        chrono::offset::Local::now().to_rfc2822()
     }
 
 }
