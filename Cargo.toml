@@ -1,4 +1,4 @@
-[workspace]
-members = [
-    "src/laji-echo"
-]
+[package]
+name = "laji-protocols"
+version = "0.0.0"
+edition = "2018"
