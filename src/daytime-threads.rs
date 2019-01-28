@@ -6,17 +6,16 @@ use std::{
     sync::{mpsc, Arc, Mutex},
 };
 
-pub fn listen<AT, AU, F, H>(addr_tcp: AT, addr_udp: AU, factory: F) -> io::Result<()>
+pub fn listen<A, F, H>(addr: A, factory: F) -> io::Result<()>
 where 
-    AT: ToSocketAddrs, 
-    AU: ToSocketAddrs,
+    A: ToSocketAddrs, 
     F: FnMut(Sender) -> H, 
     F: 'static + Send + Sync,
     H: Handler 
 {
     LajiDaytime::new(factory)
-        .bind_tcp(addr_tcp)?
-        .bind_udp(addr_udp)?
+        .bind_tcp(&addr)?
+        .bind_udp(&addr)?
         .run()
 }
 
@@ -24,6 +23,7 @@ pub struct LajiDaytime<F>
 where F: Factory {
     tcp: Vec<TcpListener>,
     udp: Vec<UdpSocket>,
+    // remote_tcp: Vec<TcpStream>,
     factory: F
 }
 
@@ -33,6 +33,7 @@ where F: Factory {
         Self {
             tcp: Vec::new(),
             udp: Vec::new(),
+            // remote_tcp: Vec::new(),
             factory
         }
     }
@@ -54,6 +55,15 @@ where F: Factory {
         self.udp.push(socket);
         Ok(self)
     }
+
+    // pub fn connect_tcp<A>(mut self, addr: A) -> io::Result<Self> 
+    // where
+    //     A: ToSocketAddrs
+    // {
+    //     let stream = TcpStream::connect(addr)?;
+    //     self.remote_tcp.push(stream);
+    //     Ok(self)
+    // }
 }
 
 impl<F> LajiDaytime<F> 
@@ -224,12 +234,11 @@ mod tests {
     use std::io;
     #[test]
     fn execute() -> io::Result<()> {
-        laji_daytime::listen("0.0.0.0:13", "0.0.0.0:13",
-            move |mut out| {
-                move || {
-                    out.send(time_string()).unwrap();
-                }
-            })
+        laji_daytime::listen("0.0.0.0:13", move |mut out| {
+            move || {
+                out.send(time_string()).unwrap();
+            }
+        })
     }
 
     #[test]
