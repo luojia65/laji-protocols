@@ -6,14 +6,18 @@ use std::{
     sync::{mpsc, Arc, Mutex},
 };
 
-pub fn listen_tcp<A, F, H>(addr: A, factory: F) -> io::Result<()>
+pub fn listen<AT, AU, F, H>(addr_tcp: AT, addr_udp: AU, factory: F) -> io::Result<()>
 where 
-    A: ToSocketAddrs, 
+    AT: ToSocketAddrs, 
+    AU: ToSocketAddrs,
     F: FnMut(Sender) -> H, 
     F: 'static + Send + Sync,
     H: Handler 
 {
-    LajiDaytime::new(factory).bind_tcp(addr)?.run()
+    LajiDaytime::new(factory)
+        .bind_tcp(addr_tcp)?
+        .bind_udp(addr_udp)?
+        .run()
 }
 
 pub struct LajiDaytime<F> 
@@ -34,14 +38,18 @@ where F: Factory {
     }
 
     pub fn bind_tcp<A>(mut self, addr: A) -> io::Result<Self>
-    where A: ToSocketAddrs {
+    where 
+        A: ToSocketAddrs 
+    {
         let listener = TcpListener::bind(addr)?;
         self.tcp.push(listener);
         Ok(self)
     }
 
     pub fn bind_udp<A>(mut self, addr: A) -> io::Result<Self>
-    where A: ToSocketAddrs {
+    where 
+        A: ToSocketAddrs 
+    {
         let socket = UdpSocket::bind(addr)?;
         self.udp.push(socket);
         Ok(self)
@@ -49,7 +57,9 @@ where F: Factory {
 }
 
 impl<F> LajiDaytime<F> 
-where F: Factory + Send + Sync + 'static {
+where 
+    F: Factory + Send + Sync + 'static 
+{
     pub fn run(self) -> io::Result<()> {
         let (err_tx, err_rx) = mpsc::channel();
         let factory = Arc::new(Mutex::new(self.factory));
@@ -106,7 +116,10 @@ pub trait Factory {
 }
 
 impl<F, H> Factory for F 
-where H: Handler, F: FnMut(Sender) -> H {
+where 
+    H: Handler, 
+    F: FnMut(Sender) -> H 
+{
     type Handler = H;
 
     fn connection_made(&mut self, sender: Sender) -> H {
@@ -155,14 +168,19 @@ pub trait Handler {
 }
 
 impl<F> Handler for F
-where F: FnMut() {
+where 
+    F: FnMut() 
+{
     fn on_request(&mut self) {
         self()
     }
 }
 
 impl<F1, F2> Handler for (F1, F2) 
-where F1: FnMut(Handshake), F2: FnMut() {
+where 
+    F1: FnMut(Handshake), 
+    F2: FnMut() 
+{
     fn on_open(&mut self, shake: Handshake) {
         self.0(shake)
     }
@@ -205,12 +223,13 @@ mod tests {
     }
     use std::io;
     #[test]
-    fn execute() {
-        laji_daytime::listen_tcp("0.0.0.0:13", move |mut out| {
-            move || {
-                out.send(time_string()).unwrap();
-            }
-        }).unwrap();
+    fn execute() -> io::Result<()> {
+        laji_daytime::listen("0.0.0.0:13", "0.0.0.0:13",
+            move |mut out| {
+                move || {
+                    out.send(time_string()).unwrap();
+                }
+            })
     }
 
     #[test]
