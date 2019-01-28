@@ -254,7 +254,7 @@ mod tests {
             }
             fn on_request(&mut self) {
                 let string = time_string();
-                self.0.send(string.clone()).unwrap();
+                self.0.send(&string).unwrap();
                 println!("Sent! [{:?}]", string);
             }
             fn on_close(&mut self) {
