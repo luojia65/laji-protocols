@@ -23,21 +23,21 @@ pub struct LajiDaytime<F>
 where F: Factory {
     tcp: Vec<TcpListener>,
     udp: Vec<UdpSocket>,
-    // remote_tcp: Vec<TcpStream>,
     factory: F
 }
 
 impl<F> LajiDaytime<F> 
 where F: Factory {
+    #[inline]
     pub fn new(factory: F) -> Self {
         Self {
             tcp: Vec::new(),
             udp: Vec::new(),
-            // remote_tcp: Vec::new(),
             factory
         }
     }
 
+    #[inline]
     pub fn bind_tcp<A>(mut self, addr: A) -> io::Result<Self>
     where 
         A: ToSocketAddrs 
@@ -47,6 +47,7 @@ where F: Factory {
         Ok(self)
     }
 
+    #[inline]
     pub fn bind_udp<A>(mut self, addr: A) -> io::Result<Self>
     where 
         A: ToSocketAddrs 
@@ -55,15 +56,6 @@ where F: Factory {
         self.udp.push(socket);
         Ok(self)
     }
-
-    // pub fn connect_tcp<A>(mut self, addr: A) -> io::Result<Self> 
-    // where
-    //     A: ToSocketAddrs
-    // {
-    //     let stream = TcpStream::connect(addr)?;
-    //     self.remote_tcp.push(stream);
-    //     Ok(self)
-    // }
 }
 
 impl<F> LajiDaytime<F> 
@@ -132,6 +124,7 @@ where
 {
     type Handler = H;
 
+    #[inline]
     fn connection_made(&mut self, sender: Sender) -> H {
         self(sender)
     }
@@ -181,6 +174,7 @@ impl<F> Handler for F
 where 
     F: FnMut() 
 {
+    #[inline]
     fn on_request(&mut self) {
         self()
     }
@@ -191,10 +185,12 @@ where
     F1: FnMut(Handshake), 
     F2: FnMut() 
 {
+    #[inline]
     fn on_open(&mut self, shake: Handshake) {
         self.0(shake)
     }
 
+    #[inline]
     fn on_request(&mut self) {
         self.1()
     }
@@ -233,7 +229,7 @@ mod tests {
     }
     use std::io;
     #[test]
-    fn execute() -> io::Result<()> {
+    fn listen_one() -> io::Result<()> {
         laji_daytime::listen("0.0.0.0:13", move |mut out| {
             move || {
                 out.send(time_string()).unwrap();
@@ -242,7 +238,7 @@ mod tests {
     }
 
     #[test]
-    fn batch() -> io::Result<()> {
+    fn listen_batch() -> io::Result<()> {
         use super::*;
         struct MyFactory;
         impl Factory for MyFactory {
