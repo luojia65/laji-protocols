@@ -7,7 +7,7 @@ edition = "2018"
 optional = true
 version = "0.6"
 
-[dev-dependencies]
+[dependencies]
 chrono = "0.4"
 
 [features]

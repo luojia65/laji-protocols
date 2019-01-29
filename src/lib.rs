@@ -2,7 +2,11 @@ pub mod discard;
 
 #[cfg(not(feature = "mio-powered"))]
 #[path = "daytime-threads.rs"]
-pub mod daytime;
+mod daytime_impl;
 #[cfg(feature = "mio-powered")]
 #[path = "daytime-mio.rs"]
-pub mod daytime;
+mod daytime_impl;
+
+pub mod daytime {
+    pub use super::daytime_impl::*;
+}

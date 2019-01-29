@@ -20,14 +20,18 @@ where
 }
 
 pub struct LajiDaytime<F> 
-where F: Factory {
+where 
+    F: Factory 
+{
     tcp: Vec<TcpListener>,
     udp: Vec<UdpSocket>,
     factory: F
 }
 
 impl<F> LajiDaytime<F> 
-where F: Factory {
+where 
+    F: Factory 
+{
     #[inline]
     pub fn new(factory: F) -> Self {
         Self {
@@ -73,9 +77,10 @@ where
                     let ans = || {
                         let stream = stream?;
                         let hs = Handshake::read_tcp_stream(&stream)?;
-                        let sender = Sender::new_tcp(stream);
-                        let mut handler = factory.lock().unwrap().connection_made(sender);
+                        let mut sender = Sender::new_tcp(stream);
+                        let mut handler = factory.lock().unwrap().connection_made(sender.try_clone()?);
                         handler.on_open(hs);
+                        sender.send_time()?;
                         handler.on_request();
                         handler.on_close();
                         Ok(())
@@ -92,9 +97,10 @@ where
                 let mut ans = || {
                     let (_size, addr) = socket.recv_from(&mut buf)?;
                     let hs = Handshake::from_udp_addr(addr);
-                    let sender = Sender::new_udp(socket.try_clone()?, addr);
-                    let mut handler = factory.lock().unwrap().connection_made(sender);
+                    let mut sender = Sender::new_udp(socket.try_clone()?, addr);
+                    let mut handler = factory.lock().unwrap().connection_made(sender.try_clone()?);
                     handler.on_open(hs);
+                    sender.send_time()?;
                     handler.on_request();
                     handler.on_close();
                     Ok(())
@@ -130,6 +136,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum Sender {
     Tcp {
         stream: TcpStream,
@@ -159,6 +166,22 @@ impl Sender {
             Sender::Tcp { stream } => stream.write(&buf),
             Sender::Udp { socket, target } => socket.send_to(&buf, *target)
         }
+    }
+
+    #[inline]
+    pub fn send_time(&mut self) -> io::Result<usize> {
+        let time_string = chrono::offset::Local::now().to_rfc2822();
+        self.send(time_string)
+    }
+
+    #[inline]
+    pub fn try_clone(&self) -> io::Result<Self> {
+        Ok(match self {
+            Sender::Tcp { stream } => 
+                Sender::Tcp { stream: stream.try_clone()? },
+            Sender::Udp { socket, target } => 
+                Sender::Udp { socket: socket.try_clone()?, target: target.clone() }
+        })
     }
 }
 
@@ -230,9 +253,9 @@ mod tests {
     use std::io;
     #[test]
     fn listen_one() -> io::Result<()> {
-        laji_daytime::listen("0.0.0.0:13", move |mut out| {
+        laji_daytime::listen("0.0.0.0:13", move |out| {
             move || {
-                out.send(time_string()).unwrap();
+                println!("Sent to {:?}", out)
             }
         })
     }
@@ -253,9 +276,7 @@ mod tests {
                 println!("Open! Shake: [{:?}]", shake);
             }
             fn on_request(&mut self) {
-                let string = time_string();
-                self.0.send(&string).unwrap();
-                println!("Sent! [{:?}]", string);
+                println!("Sent!");
             }
             fn on_close(&mut self) {
                 println!("Closed!")
@@ -269,11 +290,6 @@ mod tests {
             .run()
             .expect("Error occurred!");
         Ok(())
-    }
-
-    #[inline]
-    fn time_string() -> String {
-        chrono::offset::Local::now().to_rfc2822()
     }
 
 }
