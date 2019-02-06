@@ -1,38 +1,87 @@
 use std::{
     io,
     net::{ToSocketAddrs, TcpListener, TcpStream, SocketAddr},
+    thread,
+    sync::{mpsc, Arc, Mutex},
 };
 
 pub fn listen<A, F, H>(addr: A, factory: F) -> io::Result<()>
-where A: ToSocketAddrs, F: FnMut() -> H, H: Handler {
-    LajiDiscard::bind(addr, factory)?.run()
+where 
+    A: ToSocketAddrs, 
+    F: FnMut() -> H,
+    F: Send + Sync + 'static,
+    H: Handler 
+{
+    Builder::new().bind(addr)?.build(factory).run()
 }
 
 #[derive(Debug)]
 pub struct LajiDiscard<F>
 where F: Factory {
-    tcp: TcpListener,
+    tcp: Vec<TcpListener>,
     factory: F
 }
 
 impl<F> LajiDiscard<F>
-where F: Factory {
-    pub fn bind<A>(addr: A, factory: F) -> io::Result<Self> 
-    where A: ToSocketAddrs {
-        let tcp = TcpListener::bind(addr)?;
-        Ok(LajiDiscard {
-            tcp,
-            factory
-        })
-    }
+where F: 'static + Factory + Send + Sync {
 
-    pub fn run(&mut self) -> io::Result<()> {
-        for stream in self.tcp.incoming() {
-            let mut handler = self.factory.connection_made();
-            let stream = stream?;
-            handler.on_accept(Handshake::read_stream(&stream)?);
+    pub fn run(self) -> io::Result<()> {
+        let (err_tx, err_rx) = mpsc::channel();
+        let factory = Arc::new(Mutex::new(self.factory));
+        for listener in self.tcp {
+            let err_tx = err_tx.clone();
+            let listener = listener.try_clone()?;
+            let factory = Arc::clone(&factory);
+            thread::spawn(move || {
+                for stream in listener.incoming() {
+                    process_one_stream(factory.clone(), stream)
+                        .unwrap_or_else(|e| err_tx.send(e).unwrap())
+                }
+            });
+        }
+        while let Ok(err) = err_rx.recv() {
+            return Err(err);
         }
         Ok(())
+    }
+}
+
+fn process_one_stream<'a, F>(factory: Arc<Mutex<F>>, stream: io::Result<TcpStream>) -> io::Result<()> 
+where F: Factory
+{
+    let mut handler = factory.lock().unwrap().connection_made();
+    let stream = stream?;
+    handler.on_open(Handshake::read_stream(&stream)?);
+    drop(stream);
+    handler.on_close();
+    Ok(())
+}
+
+#[derive(Debug)]
+pub struct Builder {
+    tcp: Vec<TcpListener>,
+}
+
+impl Builder {
+    pub fn new() -> Self {
+        Self { tcp: Vec::new() }
+    }
+
+    pub fn bind<A>(mut self, addr: A) -> io::Result<Builder> 
+    where A: ToSocketAddrs 
+    {
+        let new_listener = TcpListener::bind(addr)?;
+        self.tcp.push(new_listener);
+        Ok(self)
+    }
+
+    pub fn build<F>(self, factory: F) -> LajiDiscard<F> 
+    where F: Factory
+    {
+        LajiDiscard {
+            tcp: self.tcp,
+            factory,
+        }
     }
 }
 
@@ -63,14 +112,18 @@ impl Handshake {
 }
 
 pub trait Handler {
-    fn on_accept(&mut self, _shake: Handshake) {}
+    fn on_open(&mut self, _shake: Handshake) {}
+
+    fn on_close(&mut self) {}
 }
 
 impl<F> Handler for F 
 where F: FnMut(Handshake) {
-    fn on_accept(&mut self, shake: Handshake) {
+    fn on_open(&mut self, shake: Handshake) {
         self(shake)
     }
+
+    fn on_close(&mut self) {}
 }
 
 pub trait Factory {
@@ -95,6 +148,16 @@ mod tests {
     }
     use std::thread;
     use std::net::TcpStream;
+
+    #[test]
+    fn listen() {
+        laji_discard::listen("0.0.0.0:9", move || {
+            |shake| {  
+                println!("Rejected: {:?}", shake);
+            } 
+        }).unwrap();
+    }
+
     #[test]
     fn test_listen() {
         thread::spawn(move || {
