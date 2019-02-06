@@ -5,9 +5,7 @@ use std::{
 
 pub fn listen<A, F, H>(addr: A, factory: F) -> io::Result<()>
 where A: ToSocketAddrs, F: FnMut() -> H, H: Handler {
-    let mut laji = LajiDiscard::bind(addr, factory)?;
-    laji.run()?;
-    Ok(()) 
+    LajiDiscard::bind(addr, factory)?.run()
 }
 
 #[derive(Debug)]
@@ -32,9 +30,7 @@ where F: Factory {
         for stream in self.tcp.incoming() {
             let mut handler = self.factory.connection_made();
             let stream = stream?;
-            handler.on_open(Handshake::read_stream(&stream)?);
-            drop(stream);
-            handler.on_close();
+            handler.on_accept(Handshake::read_stream(&stream)?);
         }
         Ok(())
     }
@@ -67,26 +63,13 @@ impl Handshake {
 }
 
 pub trait Handler {
-    fn on_open(&mut self, _shake: Handshake) {}
-
-    fn on_close(&mut self) {}
+    fn on_accept(&mut self, _shake: Handshake) {}
 }
 
 impl<F> Handler for F 
 where F: FnMut(Handshake) {
-    fn on_open(&mut self, shake: Handshake) {
+    fn on_accept(&mut self, shake: Handshake) {
         self(shake)
-    }
-}
-
-impl<F1, F2> Handler for (F1, F2) 
-where F1: FnMut(Handshake), F2: FnMut() {
-    fn on_open(&mut self, shake: Handshake) {
-        self.0(shake)
-    }
-
-    fn on_close(&mut self) {
-        self.1()
     }
 }
 
@@ -121,17 +104,6 @@ mod tests {
                 } 
             }).unwrap();
         });
-        thread::spawn(move || {
-            laji_discard::listen("0.0.0.0:9999", move || {
-                (|shake| {
-                    println!("Opened a session: {:?}", shake);
-                },
-                ||{
-                    println!("Closed a session")
-                })
-            }).unwrap();
-        });
         TcpStream::connect("127.0.0.1:9").unwrap();
-        TcpStream::connect("127.0.0.1:9999").unwrap();
     }
 }

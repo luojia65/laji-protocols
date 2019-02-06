@@ -1,16 +1,11 @@
-pub mod discard;
-
-#[cfg(not(feature = "mio-powered"))]
+#[path = "discard-sync.rs"]
+pub mod discard_sync;
+#[path = "discard-mio.rs"]
+pub mod discard_mio;
 #[path = "daytime-threads.rs"]
-mod daytime_impl;
-#[cfg(feature = "mio-powered")]
+pub mod daytime_threads;
 #[path = "daytime-mio.rs"]
-mod daytime_impl;
-
-pub mod daytime {
-    pub use super::daytime_impl::*;
-}
+pub mod daytime_mio;
 
 pub mod simtcp;
-
 pub mod rakping;

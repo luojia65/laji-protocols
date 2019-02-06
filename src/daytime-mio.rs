@@ -1,13 +1,14 @@
-use mio::Poll;
+// use mio::Poll;
 
-pub struct LajiDaytime<F>
-// where F: Factory
-{
-    factory: F
-}
+// pub struct LajiDaytime<F>
+// // where F: Factory
+// {
+//     factory: F
+// }
 
-impl LajiDaytime<F> {
-    pub fn run(mut self) {
+// impl<F> LajiDaytime<F> {
+//     pub fn run(mut self) {
 
-    }
-}
+//     }
+// }
+
