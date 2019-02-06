@@ -152,8 +152,8 @@ mod tests {
     #[test]
     fn listen() {
         laji_discard::listen("0.0.0.0:9", move || {
-            |shake| {  
-                println!("Rejected: {:?}", shake);
+            |shake: super::Handshake| {                      
+                println!("Remote {} connected to {}", shake.peer_addr(), shake.local_addr());
             } 
         }).unwrap();
     }
@@ -162,11 +162,44 @@ mod tests {
     fn test_listen() {
         thread::spawn(move || {
             laji_discard::listen("0.0.0.0:9", move || {
-                |shake| {  
-                    println!("Rejected: {:?}", shake);
+                |shake: super::Handshake| {  
+                println!("Remote {} connected to {}", shake.peer_addr(), shake.local_addr());
                 } 
             }).unwrap();
         });
         TcpStream::connect("127.0.0.1:9").unwrap();
+    }
+
+    #[test]
+    fn test_batch() -> std::io::Result<()> {
+        use super::*;
+        struct MyFactory;
+        impl Factory for MyFactory {
+            type Handler = MyHandler;
+            fn connection_made(&mut self) -> MyHandler {
+                MyHandler(None)
+            }
+        }
+        struct MyHandler(Option<Handshake>);
+        impl Handler for MyHandler {
+            fn on_open(&mut self, shake: Handshake) {                
+                println!("Remote {} connected to {}", shake.peer_addr(), shake.local_addr());
+                self.0 = Some(shake);
+            }
+            fn on_close(&mut self) {
+                let shake = self.0.unwrap();
+                println!("Closed remote {} at {}!", shake.peer_addr(), shake.local_addr());
+            }
+        }
+        thread::spawn(move || {
+            Builder::new()
+                .bind("0.0.0.0:9").unwrap()
+                .bind("0.0.0.0:9999").unwrap()
+                .build(MyFactory)
+                .run().unwrap();
+        });
+        TcpStream::connect("127.0.0.1:9").unwrap();
+        TcpStream::connect("127.0.0.1:9999").unwrap();
+        Ok(())
     }
 }
