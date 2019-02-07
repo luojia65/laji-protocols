@@ -6,3 +6,4 @@ edition = "2018"
 [dependencies]
 chrono = "0.4"
 mio = "0.6"
+slab = "*"

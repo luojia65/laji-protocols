@@ -17,14 +17,16 @@ where
 
 #[derive(Debug)]
 pub struct LajiDiscard<F>
-where F: Factory {
+where F: Factory
+{
     tcp: Vec<TcpListener>,
     factory: F
 }
 
 impl<F> LajiDiscard<F>
-where F: 'static + Factory + Send + Sync {
-
+where   
+    F: 'static + Factory + Send + Sync 
+{
     pub fn run(self) -> io::Result<()> {
         let (err_tx, err_rx) = mpsc::channel();
         let factory = Arc::new(Mutex::new(self.factory));
@@ -46,7 +48,7 @@ where F: 'static + Factory + Send + Sync {
     }
 }
 
-fn process_one_stream<'a, F>(factory: Arc<Mutex<F>>, stream: io::Result<TcpStream>) -> io::Result<()> 
+fn process_one_stream<F>(factory: Arc<Mutex<F>>, stream: io::Result<TcpStream>) -> io::Result<()> 
 where F: Factory
 {
     let mut handler = factory.lock().unwrap().connection_made();
