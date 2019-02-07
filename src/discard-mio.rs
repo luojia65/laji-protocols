@@ -45,7 +45,7 @@ impl<F> LajiDiscard<F>
 where F: Factory 
 {
     pub fn run(mut self) -> io::Result<()> {
-        let mut events = Events::with_capacity(1024);
+        let mut events = Events::with_capacity(self.listeners.len());
         loop {
             self.poll.poll(&mut events, None)?;
             for event in &events {
@@ -223,6 +223,7 @@ mod tests {
                 .build(MyFactory).unwrap()
                 .run().unwrap();
         });
+        std::net::TcpStream::connect("127.0.0.1:9").unwrap();
         std::net::TcpStream::connect("127.0.0.1:9").unwrap();
         std::net::TcpStream::connect("127.0.0.1:9999").unwrap();
         Ok(())
