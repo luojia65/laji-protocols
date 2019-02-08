@@ -1,4 +1,3 @@
 # laji-protocols
 
-Implementation of 'laji protocols' ('naive protocols' in Chinese) using [`mio`] framework. Built in order to learn [`mio`] and get familiar with Rust developing of network protocol libraries. 
-[`mio`]: https://github.com/carllerche/mio
+Implementations of some simple protocols. Built to learn Rusty structure of network programming, as well as learn mio, tokio, romio and more network frameworks.

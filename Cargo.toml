@@ -6,4 +6,10 @@ edition = "2018"
 [dependencies]
 chrono = "0.4"
 mio = "0.6"
-slab = "*"
+slab = "0.4"
+tokio = "*"
+romio = "0.3.0-alpha.1"
+
+[dependencies.futures]
+version = "0.3.0-alpha.11"
+package = "futures-preview"
